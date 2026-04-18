@@ -177,3 +177,187 @@ async def async_prepare_files_for_prompt(
         return content
 
     return await hass.async_add_executor_job(_prepare)
+
+
+async def _transform_stream(
+    chat_log: conversation.ChatLog,
+    stream: AsyncStream[ChatCompletionChunk],
+) -> AsyncGenerator[
+    conversation.AssistantContentDeltaDict | conversation.ToolResultContentDeltaDict
+]:
+    """Transform a Chat Completions stream into HA delta format."""
+    current_tool_calls: dict[int, dict[str, Any]] = {}
+
+    async for chunk in stream:
+        if not chunk.choices:
+            if chunk.usage is not None:
+                chat_log.async_trace(
+                    {
+                        "stats": {
+                            "input_tokens": chunk.usage.prompt_tokens,
+                            "output_tokens": chunk.usage.completion_tokens,
+                        }
+                    }
+                )
+            continue
+
+        choice = chunk.choices[0]
+        delta = choice.delta
+
+        if delta.role == "assistant":
+            yield {"role": "assistant"}
+
+        if delta.content is not None:
+            yield {"content": delta.content}
+
+        if delta.tool_calls:
+            for tc_delta in delta.tool_calls:
+                idx = tc_delta.index
+                if idx not in current_tool_calls:
+                    current_tool_calls[idx] = {
+                        "id": "",
+                        "function": {"name": "", "arguments": ""},
+                    }
+                tc = current_tool_calls[idx]
+                if tc_delta.id:
+                    tc["id"] = tc_delta.id
+                if tc_delta.function:
+                    if tc_delta.function.name:
+                        tc["function"]["name"] = tc_delta.function.name
+                    if tc_delta.function.arguments:
+                        tc["function"]["arguments"] += tc_delta.function.arguments
+
+        if choice.finish_reason == "tool_calls" and current_tool_calls:
+            yield {
+                "tool_calls": [
+                    llm.ToolInput(
+                        id=tc["id"],
+                        tool_name=tc["function"]["name"],
+                        tool_args=json.loads(tc["function"]["arguments"]),
+                    )
+                    for tc in current_tool_calls.values()
+                ]
+            }
+            current_tool_calls = {}
+
+        if choice.finish_reason == "length":
+            raise HomeAssistantError("Response incomplete: max output tokens reached")
+
+        if choice.finish_reason == "content_filter":
+            raise HomeAssistantError("Response incomplete: content filter triggered")
+
+
+class GenericBaseLLMEntity(Entity):
+    """Base entity for Generic Conversation LLM entities."""
+
+    _attr_has_entity_name = True
+    _attr_name: str | None = None
+
+    def __init__(
+        self, entry: GenericConversationConfigEntry, subentry: ConfigSubentry
+    ) -> None:
+        """Initialize the entity."""
+        self.entry = entry
+        self.subentry = subentry
+        self._attr_unique_id = subentry.subentry_id
+        self._attr_device_info = dr.DeviceInfo(
+            identifiers={(DOMAIN, subentry.subentry_id)},
+            name=subentry.title,
+            manufacturer="Generic",
+            model=subentry.data.get(CONF_CHAT_MODEL, DEFAULT_CHAT_MODEL),
+            entry_type=dr.DeviceEntryType.SERVICE,
+        )
+
+    async def _async_handle_chat_log(
+        self,
+        chat_log: conversation.ChatLog,
+        structure_name: str | None = None,
+        structure: vol.Schema | None = None,
+        max_iterations: int = MAX_TOOL_ITERATIONS,
+    ) -> None:
+        """Generate an answer for the chat log."""
+        options = self.subentry.data
+
+        messages = _convert_content_to_param(chat_log.content)
+
+        model_args: dict[str, Any] = {
+            "model": options.get(CONF_CHAT_MODEL, DEFAULT_CHAT_MODEL),
+            "messages": messages,
+            "max_tokens": options.get(CONF_MAX_TOKENS, DEFAULT_MAX_TOKENS),
+            "top_p": options.get(CONF_TOP_P, DEFAULT_TOP_P),
+            "temperature": options.get(CONF_TEMPERATURE, DEFAULT_TEMPERATURE),
+            "stream": True,
+            "user": chat_log.conversation_id,
+        }
+
+        if chat_log.llm_api and chat_log.llm_api.tools:
+            model_args["tools"] = [
+                _format_tool(tool, chat_log.llm_api.custom_serializer)
+                for tool in chat_log.llm_api.tools
+            ]
+
+        if structure and structure_name:
+            model_args["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": slugify(structure_name),
+                    "schema": _format_structured_output(structure, chat_log.llm_api),
+                },
+            }
+
+        last_content = chat_log.content[-1]
+        if last_content.role == "user" and last_content.attachments:
+            files = await async_prepare_files_for_prompt(
+                self.hass,
+                [(a.path, a.mime_type) for a in last_content.attachments],
+            )
+            last_message = messages[-1]
+            assert isinstance(last_message.get("content"), str)
+            last_message["content"] = [
+                {"type": "text", "text": last_message["content"]},
+                *files,
+            ]
+
+        model_args["stream_options"] = {"include_usage": True}
+
+        client = self.entry.runtime_data
+
+        for _iteration in range(max_iterations):
+            try:
+                response = await client.chat.completions.create(**model_args)
+
+                messages.extend(
+                    _convert_content_to_param(
+                        [
+                            content
+                            async for content in (
+                                chat_log.async_add_delta_content_stream(
+                                    self.entity_id,
+                                    _transform_stream(chat_log, response),
+                                )
+                            )
+                        ]
+                    )
+                )
+            except openai.AuthenticationError as err:
+                self.entry.async_start_reauth(self.hass)
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="authentication_error",
+                ) from err
+            except openai.RateLimitError as err:
+                raise HomeAssistantError(
+                    "Rate limited or insufficient funds"
+                ) from err
+            except openai.APIConnectionError as err:
+                raise HomeAssistantError(
+                    "Could not connect to API endpoint"
+                ) from err
+            except openai.APIError as err:
+                LOGGER.error("Error talking to API endpoint: %s", err)
+                raise HomeAssistantError(
+                    "Error talking to API endpoint"
+                ) from err
+
+            if not chat_log.unresponded_tool_results:
+                break
