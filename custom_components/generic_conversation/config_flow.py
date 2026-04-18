@@ -95,8 +95,8 @@ class GenericConversationConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "invalid_auth"
             except openai.APIConnectionError:
                 errors["base"] = "cannot_connect"
-            except openai.OpenAIError:
-                pass  # Endpoint may not support GET /models — proceed
+            except openai.OpenAIError as err:
+                _LOGGER.debug("Could not validate endpoint: %s", err)
 
             if not errors:
                 if self.source == SOURCE_REAUTH:

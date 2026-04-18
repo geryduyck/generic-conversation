@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
     from . import GenericConversationConfigEntry
 
-LOGGER = __import__("logging").getLogger(__name__)
+_LOGGER = __import__("logging").getLogger(__name__)
 
 
 async def async_setup_entry(
@@ -79,7 +79,7 @@ class GenericTaskEntity(
         try:
             data = json_loads(text)
         except JSONDecodeError as err:
-            LOGGER.error(
+            _LOGGER.error(
                 "Failed to parse JSON response: %s. Response: %s", err, text
             )
             raise HomeAssistantError(

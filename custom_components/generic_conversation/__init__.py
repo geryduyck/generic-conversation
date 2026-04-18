@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.httpx_client import get_async_client
 
-from .const import CONF_BASE_URL
+from .const import CONF_BASE_URL, LOGGER
 
 PLATFORMS = (Platform.AI_TASK, Platform.CONVERSATION)
 
@@ -31,8 +31,8 @@ async def async_setup_entry(
         await client.models.list(timeout=10.0)
     except openai.AuthenticationError as err:
         raise ConfigEntryAuthFailed(err) from err
-    except openai.OpenAIError:
-        pass  # Many endpoints don't support GET /models — proceed anyway
+    except openai.OpenAIError as err:
+        LOGGER.debug("Could not validate endpoint: %s", err)
 
     entry.runtime_data = client
 

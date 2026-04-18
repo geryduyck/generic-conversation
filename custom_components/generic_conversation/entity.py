@@ -312,7 +312,8 @@ class GenericBaseLLMEntity(Entity):
                 [(a.path, a.mime_type) for a in last_content.attachments],
             )
             last_message = messages[-1]
-            assert isinstance(last_message.get("content"), str)
+            if not isinstance(last_message.get("content"), str):
+                raise HomeAssistantError("Expected string content in last message")
             last_message["content"] = [
                 {"type": "text", "text": last_message["content"]},
                 *files,
