@@ -15,3 +15,5 @@ venv/
 .vscode/
 *.swp
 *.swo
+.claude/
+docs/
