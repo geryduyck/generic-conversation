@@ -1,0 +1,12 @@
+{
+  "domain": "generic_conversation",
+  "name": "Generic Conversation",
+  "codeowners": [],
+  "config_flow": true,
+  "dependencies": ["conversation"],
+  "documentation": "https://github.com/geryduyck/generic-conversation",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "requirements": ["openai>=1.0.0"],
+  "version": "1.0.0"
+}

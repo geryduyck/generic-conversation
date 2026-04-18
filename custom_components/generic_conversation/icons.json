@@ -1,0 +1,6 @@
+{
+  "services": {
+    "conversation": { "service": "mdi:chat-processing" },
+    "ai_task_data": { "service": "mdi:creation" }
+  }
+}
