@@ -59,9 +59,7 @@ _LOGGER = logging.getLogger(__name__)
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
         vol.Optional(CONF_API_KEY): str,
-        vol.Required(
-            CONF_BASE_URL, default="http://localhost:11434/v1"
-        ): str,
+        vol.Required(CONF_BASE_URL, default="http://localhost:11434/v1"): str,
     }
 )
 
@@ -79,9 +77,7 @@ class GenericConversationConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            self._async_abort_entries_match(
-                {CONF_BASE_URL: user_input[CONF_BASE_URL]}
-            )
+            self._async_abort_entries_match({CONF_BASE_URL: user_input[CONF_BASE_URL]})
 
             client = openai.AsyncOpenAI(
                 api_key=user_input.get(CONF_API_KEY) or None,
@@ -143,14 +139,10 @@ class GenericConversationConfigFlow(ConfigFlow, domain=DOMAIN):
         if not user_input:
             return self.async_show_form(
                 step_id="reauth_confirm",
-                data_schema=vol.Schema(
-                    {vol.Required(CONF_API_KEY): str}
-                ),
+                data_schema=vol.Schema({vol.Required(CONF_API_KEY): str}),
             )
         reauth_entry = self._get_reauth_entry()
-        return await self.async_step_user(
-            {**reauth_entry.data, **user_input}
-        )
+        return await self.async_step_user({**reauth_entry.data, **user_input})
 
     @classmethod
     @callback
@@ -239,9 +231,7 @@ class GenericSubentryFlowHandler(ConfigSubentryFlow):
             )
 
         step_schema[
-            vol.Required(
-                CONF_RECOMMENDED, default=options.get(CONF_RECOMMENDED, False)
-            )
+            vol.Required(CONF_RECOMMENDED, default=options.get(CONF_RECOMMENDED, False))
         ] = bool
 
         if user_input is not None:
@@ -282,9 +272,7 @@ class GenericSubentryFlowHandler(ConfigSubentryFlow):
             vol.Optional(
                 CONF_CHAT_MODEL,
                 default=DEFAULT_CHAT_MODEL,
-            ): TextSelector(
-                TextSelectorConfig(type=TextSelectorType.TEXT)
-            ),
+            ): TextSelector(TextSelectorConfig(type=TextSelectorType.TEXT)),
             vol.Optional(
                 CONF_MAX_TOKENS,
                 default=DEFAULT_MAX_TOKENS,

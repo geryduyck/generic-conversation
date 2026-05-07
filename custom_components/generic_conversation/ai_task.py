@@ -15,8 +15,6 @@ from .const import DOMAIN
 from .entity import GenericBaseLLMEntity
 
 if TYPE_CHECKING:
-    from homeassistant.config_entries import ConfigSubentry
-
     from . import GenericConversationConfigEntry
 
 _LOGGER = __import__("logging").getLogger(__name__)
@@ -79,9 +77,7 @@ class GenericTaskEntity(
         try:
             data = json_loads(text)
         except JSONDecodeError as err:
-            _LOGGER.error(
-                "Failed to parse JSON response: %s. Response: %s", err, text
-            )
+            _LOGGER.error("Failed to parse JSON response: %s. Response: %s", err, text)
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
                 translation_key="json_parse_error",

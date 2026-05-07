@@ -350,18 +350,12 @@ class GenericBaseLLMEntity(Entity):
                     translation_key="authentication_error",
                 ) from err
             except openai.RateLimitError as err:
-                raise HomeAssistantError(
-                    "Rate limited or insufficient funds"
-                ) from err
+                raise HomeAssistantError("Rate limited or insufficient funds") from err
             except openai.APIConnectionError as err:
-                raise HomeAssistantError(
-                    "Could not connect to API endpoint"
-                ) from err
+                raise HomeAssistantError("Could not connect to API endpoint") from err
             except openai.APIError as err:
                 LOGGER.error("Error talking to API endpoint: %s", err)
-                raise HomeAssistantError(
-                    "Error talking to API endpoint"
-                ) from err
+                raise HomeAssistantError("Error talking to API endpoint") from err
 
             if not chat_log.unresponded_tool_results:
                 break

@@ -127,8 +127,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     yaml_services = {slugify(s[CONF_NAME]): s for s in conf[CONF_SERVICES]}
 
     existing_entries = {
-        entry.unique_id: entry
-        for entry in hass.config_entries.async_entries(DOMAIN)
+        entry.unique_id: entry for entry in hass.config_entries.async_entries(DOMAIN)
     }
 
     for unique_id, service_conf in yaml_services.items():
@@ -178,13 +177,10 @@ async def _async_reload(hass: HomeAssistant) -> None:
             await hass.config_entries.async_remove(entry.entry_id)
         return
 
-    yaml_services = {
-        slugify(s[CONF_NAME]): s for s in conf[DOMAIN][CONF_SERVICES]
-    }
+    yaml_services = {slugify(s[CONF_NAME]): s for s in conf[DOMAIN][CONF_SERVICES]}
 
     existing_entries = {
-        entry.unique_id: entry
-        for entry in hass.config_entries.async_entries(DOMAIN)
+        entry.unique_id: entry for entry in hass.config_entries.async_entries(DOMAIN)
     }
 
     for unique_id, service_conf in yaml_services.items():

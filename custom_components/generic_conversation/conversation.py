@@ -76,9 +76,7 @@ class GenericConversationEntity(
             await chat_log.async_provide_llm_data(
                 user_input.as_llm_context(DOMAIN),
                 self._config.get(CONF_LLM_HASS_API),
-                self._config.get(
-                    CONF_SYSTEM_PROMPT, llm.DEFAULT_INSTRUCTIONS_PROMPT
-                ),
+                self._config.get(CONF_SYSTEM_PROMPT, llm.DEFAULT_INSTRUCTIONS_PROMPT),
                 user_input.extra_system_prompt,
             )
         except conversation.ConverseError as err:
