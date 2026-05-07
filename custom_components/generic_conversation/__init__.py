@@ -8,7 +8,7 @@ import openai
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry, SOURCE_IMPORT
-from homeassistant.const import CONF_API_KEY, Platform
+from homeassistant.const import CONF_API_KEY, CONF_LLM_HASS_API, Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.httpx_client import get_async_client
@@ -61,7 +61,9 @@ AGENT_CONVERSATION_SCHEMA = vol.Schema(
             vol.Coerce(float), vol.Range(min=0, max=1)
         ),
         vol.Optional(CONF_SYSTEM_PROMPT): cv.string,
-        vol.Optional("llm_hass_api"): vol.All(cv.ensure_list, [cv.string]),
+        vol.Optional(CONF_LLM_HASS_API, default=["assist"]): vol.All(
+            cv.ensure_list, [cv.string]
+        ),
     }
 )
 

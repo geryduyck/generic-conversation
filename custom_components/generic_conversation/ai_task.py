@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from json import JSONDecodeError
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components import ai_task, conversation
 from homeassistant.core import HomeAssistant
@@ -11,13 +11,11 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util.json import json_loads
 
-from .const import DOMAIN
+from .const import CONF_AGENTS, CONF_TYPE, DOMAIN, LOGGER
 from .entity import GenericBaseLLMEntity
 
 if TYPE_CHECKING:
     from . import GenericConversationConfigEntry
-
-_LOGGER = __import__("logging").getLogger(__name__)
 
 
 async def async_setup_entry(
@@ -26,13 +24,13 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up AI Task entities."""
-    for subentry in config_entry.subentries.values():
-        if subentry.subentry_type != "ai_task_data":
-            continue
-        async_add_entities(
-            [GenericTaskEntity(config_entry, subentry)],
-            config_subentry_id=subentry.subentry_id,
-        )
+    entities = [
+        GenericTaskEntity(config_entry, agent_config)
+        for agent_config in config_entry.data[CONF_AGENTS]
+        if agent_config[CONF_TYPE] == "ai_task"
+    ]
+    if entities:
+        async_add_entities(entities)
 
 
 class GenericTaskEntity(
@@ -45,7 +43,14 @@ class GenericTaskEntity(
         ai_task.AITaskEntityFeature.GENERATE_DATA
         | ai_task.AITaskEntityFeature.SUPPORT_ATTACHMENTS
     )
-    _attr_translation_key = "ai_task_data"
+
+    def __init__(
+        self,
+        entry: GenericConversationConfigEntry,
+        agent_config: dict[str, Any],
+    ) -> None:
+        """Initialize the entity."""
+        super().__init__(entry, agent_config)
 
     async def _async_generate_data(
         self,
@@ -77,7 +82,7 @@ class GenericTaskEntity(
         try:
             data = json_loads(text)
         except JSONDecodeError as err:
-            _LOGGER.error("Failed to parse JSON response: %s. Response: %s", err, text)
+            LOGGER.error("Failed to parse JSON response: %s. Response: %s", err, text)
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
                 translation_key="json_parse_error",
