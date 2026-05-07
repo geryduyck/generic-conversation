@@ -21,7 +21,6 @@ import voluptuous as vol
 from voluptuous_openapi import convert
 
 from homeassistant.components import conversation
-from homeassistant.config_entries import ConfigSubentry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr, llm
@@ -30,11 +29,12 @@ from homeassistant.helpers.json import json_dumps
 from homeassistant.util import slugify
 
 from .const import (
+    CONF_BASE_URL,
     CONF_CHAT_MODEL,
     CONF_MAX_TOKENS,
+    CONF_NAME,
     CONF_TEMPERATURE,
     CONF_TOP_P,
-    DEFAULT_CHAT_MODEL,
     DEFAULT_MAX_TOKENS,
     DEFAULT_TEMPERATURE,
     DEFAULT_TOP_P,
@@ -251,20 +251,24 @@ class GenericBaseLLMEntity(Entity):
     """Base entity for Generic Conversation LLM entities."""
 
     _attr_has_entity_name = True
-    _attr_name: str | None = None
 
     def __init__(
-        self, entry: GenericConversationConfigEntry, subentry: ConfigSubentry
+        self,
+        entry: GenericConversationConfigEntry,
+        agent_config: dict[str, Any],
     ) -> None:
         """Initialize the entity."""
         self.entry = entry
-        self.subentry = subentry
-        self._attr_unique_id = subentry.subentry_id
+        self._config = agent_config
+        service_slug = slugify(entry.data[CONF_NAME])
+        agent_slug = slugify(agent_config[CONF_NAME])
+        self._attr_unique_id = f"{service_slug}_{agent_slug}"
+        self._attr_name = agent_config[CONF_NAME]
         self._attr_device_info = dr.DeviceInfo(
-            identifiers={(DOMAIN, subentry.subentry_id)},
-            name=subentry.title,
+            identifiers={(DOMAIN, service_slug)},
+            name=entry.data[CONF_NAME],
             manufacturer="Generic",
-            model=subentry.data.get(CONF_CHAT_MODEL, DEFAULT_CHAT_MODEL),
+            model=entry.data[CONF_BASE_URL],
             entry_type=dr.DeviceEntryType.SERVICE,
         )
 
@@ -276,12 +280,12 @@ class GenericBaseLLMEntity(Entity):
         max_iterations: int = MAX_TOOL_ITERATIONS,
     ) -> None:
         """Generate an answer for the chat log."""
-        options = self.subentry.data
+        options = self._config
 
         messages = _convert_content_to_param(chat_log.content)
 
         model_args: dict[str, Any] = {
-            "model": options.get(CONF_CHAT_MODEL, DEFAULT_CHAT_MODEL),
+            "model": options[CONF_CHAT_MODEL],
             "messages": messages,
             "max_tokens": options.get(CONF_MAX_TOKENS, DEFAULT_MAX_TOKENS),
             "top_p": options.get(CONF_TOP_P, DEFAULT_TOP_P),
@@ -341,24 +345,17 @@ class GenericBaseLLMEntity(Entity):
                     )
                 )
             except openai.AuthenticationError as err:
-                self.entry.async_start_reauth(self.hass)
                 raise HomeAssistantError(
                     translation_domain=DOMAIN,
                     translation_key="authentication_error",
                 ) from err
             except openai.RateLimitError as err:
-                raise HomeAssistantError(
-                    "Rate limited or insufficient funds"
-                ) from err
+                raise HomeAssistantError("Rate limited or insufficient funds") from err
             except openai.APIConnectionError as err:
-                raise HomeAssistantError(
-                    "Could not connect to API endpoint"
-                ) from err
+                raise HomeAssistantError("Could not connect to API endpoint") from err
             except openai.APIError as err:
                 LOGGER.error("Error talking to API endpoint: %s", err)
-                raise HomeAssistantError(
-                    "Error talking to API endpoint"
-                ) from err
+                raise HomeAssistantError("Error talking to API endpoint") from err
 
             if not chat_log.unresponded_tool_results:
                 break

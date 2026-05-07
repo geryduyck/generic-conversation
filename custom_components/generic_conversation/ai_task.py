@@ -82,9 +82,7 @@ class GenericTaskEntity(
         try:
             data = json_loads(text)
         except JSONDecodeError as err:
-            LOGGER.error(
-                "Failed to parse JSON response: %s. Response: %s", err, text
-            )
+            LOGGER.error("Failed to parse JSON response: %s. Response: %s", err, text)
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
                 translation_key="json_parse_error",

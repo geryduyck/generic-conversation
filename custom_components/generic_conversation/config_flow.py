@@ -14,9 +14,7 @@ class GenericConversationConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    async def async_step_import(
-        self, import_data: dict[str, Any]
-    ) -> ConfigFlowResult:
+    async def async_step_import(self, import_data: dict[str, Any]) -> ConfigFlowResult:
         """Handle import from YAML configuration."""
         await self.async_set_unique_id(import_data["unique_id"])
         self._abort_if_unique_id_configured()
