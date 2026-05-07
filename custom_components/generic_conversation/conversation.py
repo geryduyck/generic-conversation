@@ -1,15 +1,17 @@
 """Conversation support for Generic Conversation."""
 
-from typing import Literal
+from __future__ import annotations
+
+from typing import Any, Literal
 
 from homeassistant.components import conversation
-from homeassistant.config_entries import ConfigSubentry
 from homeassistant.const import CONF_LLM_HASS_API, MATCH_ALL
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import llm
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import GenericConversationConfigEntry
-from .const import CONF_PROMPT, DOMAIN
+from .const import CONF_AGENTS, CONF_SYSTEM_PROMPT, CONF_TYPE, DOMAIN
 from .entity import GenericBaseLLMEntity
 
 
@@ -19,13 +21,13 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up conversation entities."""
-    for subentry in config_entry.subentries.values():
-        if subentry.subentry_type != "conversation":
-            continue
-        async_add_entities(
-            [GenericConversationEntity(config_entry, subentry)],
-            config_subentry_id=subentry.subentry_id,
-        )
+    entities = [
+        GenericConversationEntity(config_entry, agent_config)
+        for agent_config in config_entry.data[CONF_AGENTS]
+        if agent_config[CONF_TYPE] == "conversation"
+    ]
+    if entities:
+        async_add_entities(entities)
 
 
 class GenericConversationEntity(
@@ -38,11 +40,13 @@ class GenericConversationEntity(
     _attr_supports_streaming = True
 
     def __init__(
-        self, entry: GenericConversationConfigEntry, subentry: ConfigSubentry
+        self,
+        entry: GenericConversationConfigEntry,
+        agent_config: dict[str, Any],
     ) -> None:
         """Initialize the agent."""
-        super().__init__(entry, subentry)
-        if self.subentry.data.get(CONF_LLM_HASS_API):
+        super().__init__(entry, agent_config)
+        if self._config.get(CONF_LLM_HASS_API):
             self._attr_supported_features = (
                 conversation.ConversationEntityFeature.CONTROL
             )
@@ -68,13 +72,13 @@ class GenericConversationEntity(
         chat_log: conversation.ChatLog,
     ) -> conversation.ConversationResult:
         """Process the user input and call the API."""
-        options = self.subentry.data
-
         try:
             await chat_log.async_provide_llm_data(
                 user_input.as_llm_context(DOMAIN),
-                options.get(CONF_LLM_HASS_API),
-                options.get(CONF_PROMPT),
+                self._config.get(CONF_LLM_HASS_API),
+                self._config.get(
+                    CONF_SYSTEM_PROMPT, llm.DEFAULT_INSTRUCTIONS_PROMPT
+                ),
                 user_input.extra_system_prompt,
             )
         except conversation.ConverseError as err:
