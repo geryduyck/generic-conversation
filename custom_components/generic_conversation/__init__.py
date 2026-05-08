@@ -29,8 +29,6 @@ from .const import (
     CONF_TOP_P,
     CONF_TYPE,
     DEFAULT_MAX_TOKENS,
-    DEFAULT_TEMPERATURE,
-    DEFAULT_TOP_P,
     DOMAIN,
     LOGGER,
 )
@@ -59,10 +57,10 @@ AGENT_CONVERSATION_SCHEMA = vol.Schema(
         vol.Optional(CONF_MAX_TOKENS, default=DEFAULT_MAX_TOKENS): vol.All(
             vol.Coerce(int), vol.Range(min=1)
         ),
-        vol.Optional(CONF_TEMPERATURE, default=DEFAULT_TEMPERATURE): vol.All(
+        vol.Optional(CONF_TEMPERATURE): vol.All(
             vol.Coerce(float), vol.Range(min=0, max=2)
         ),
-        vol.Optional(CONF_TOP_P, default=DEFAULT_TOP_P): vol.All(
+        vol.Optional(CONF_TOP_P): vol.All(
             vol.Coerce(float), vol.Range(min=0, max=1)
         ),
         vol.Optional(CONF_SYSTEM_PROMPT): cv.string,
@@ -80,10 +78,10 @@ AGENT_AI_TASK_SCHEMA = vol.Schema(
         vol.Optional(CONF_MAX_TOKENS, default=DEFAULT_MAX_TOKENS): vol.All(
             vol.Coerce(int), vol.Range(min=1)
         ),
-        vol.Optional(CONF_TEMPERATURE, default=DEFAULT_TEMPERATURE): vol.All(
+        vol.Optional(CONF_TEMPERATURE): vol.All(
             vol.Coerce(float), vol.Range(min=0, max=2)
         ),
-        vol.Optional(CONF_TOP_P, default=DEFAULT_TOP_P): vol.All(
+        vol.Optional(CONF_TOP_P): vol.All(
             vol.Coerce(float), vol.Range(min=0, max=1)
         ),
     }

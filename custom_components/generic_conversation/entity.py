@@ -36,8 +36,6 @@ from .const import (
     CONF_TEMPERATURE,
     CONF_TOP_P,
     DEFAULT_MAX_TOKENS,
-    DEFAULT_TEMPERATURE,
-    DEFAULT_TOP_P,
     DOMAIN,
     LOGGER,
     MAX_TOOL_ITERATIONS,
@@ -288,11 +286,14 @@ class GenericBaseLLMEntity(Entity):
             "model": options[CONF_CHAT_MODEL],
             "messages": messages,
             "max_tokens": options.get(CONF_MAX_TOKENS, DEFAULT_MAX_TOKENS),
-            "top_p": options.get(CONF_TOP_P, DEFAULT_TOP_P),
-            "temperature": options.get(CONF_TEMPERATURE, DEFAULT_TEMPERATURE),
             "stream": True,
             "user": chat_log.conversation_id,
         }
+
+        if CONF_TEMPERATURE in options:
+            model_args["temperature"] = options[CONF_TEMPERATURE]
+        if CONF_TOP_P in options:
+            model_args["top_p"] = options[CONF_TOP_P]
 
         if chat_log.llm_api and chat_log.llm_api.tools:
             model_args["tools"] = [
