@@ -128,20 +128,13 @@ CONFIG_SCHEMA = vol.Schema(
 async def _reconcile_entries(
     hass: HomeAssistant, yaml_services: dict[str, dict[str, Any]]
 ) -> None:
-    """Reconcile config entries with YAML service definitions."""
+    """Reconcile config entries with YAML service definitions (awaited, for reload)."""
     existing_entries = {
         entry.unique_id: entry for entry in hass.config_entries.async_entries(DOMAIN)
     }
 
     for unique_id, service_conf in yaml_services.items():
-        import_data = {
-            "unique_id": unique_id,
-            CONF_NAME: service_conf[CONF_NAME],
-            CONF_BASE_URL: service_conf[CONF_BASE_URL],
-            CONF_AGENTS: service_conf[CONF_AGENTS],
-        }
-        if CONF_API_KEY in service_conf:
-            import_data[CONF_API_KEY] = service_conf[CONF_API_KEY]
+        import_data = _build_import_data(unique_id, service_conf)
 
         if unique_id in existing_entries:
             entry = existing_entries[unique_id]
@@ -160,6 +153,19 @@ async def _reconcile_entries(
             await hass.config_entries.async_remove(entry.entry_id)
 
 
+def _build_import_data(unique_id: str, service_conf: dict[str, Any]) -> dict[str, Any]:
+    """Build the import data dict for a service config entry."""
+    import_data = {
+        "unique_id": unique_id,
+        CONF_NAME: service_conf[CONF_NAME],
+        CONF_BASE_URL: service_conf[CONF_BASE_URL],
+        CONF_AGENTS: service_conf[CONF_AGENTS],
+    }
+    if CONF_API_KEY in service_conf:
+        import_data[CONF_API_KEY] = service_conf[CONF_API_KEY]
+    return import_data
+
+
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up Generic Conversation from YAML configuration."""
     if DOMAIN not in config:
@@ -167,7 +173,31 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
     conf = config[DOMAIN]
     yaml_services = {slugify(s[CONF_NAME]): s for s in conf[CONF_SERVICES]}
-    await _reconcile_entries(hass, yaml_services)
+
+    existing_entries = {
+        entry.unique_id: entry for entry in hass.config_entries.async_entries(DOMAIN)
+    }
+
+    for unique_id, service_conf in yaml_services.items():
+        import_data = _build_import_data(unique_id, service_conf)
+
+        if unique_id in existing_entries:
+            entry = existing_entries[unique_id]
+            if entry.data != import_data:
+                hass.config_entries.async_update_entry(entry, data=import_data)
+                hass.async_create_task(hass.config_entries.async_reload(entry.entry_id))
+        else:
+            hass.async_create_task(
+                hass.config_entries.flow.async_init(
+                    DOMAIN,
+                    context={"source": SOURCE_IMPORT},
+                    data=import_data,
+                )
+            )
+
+    for unique_id, entry in existing_entries.items():
+        if unique_id not in yaml_services:
+            hass.async_create_task(hass.config_entries.async_remove(entry.entry_id))
 
     async def handle_reload(_call: ServiceCall) -> None:
         """Handle reload service call."""
